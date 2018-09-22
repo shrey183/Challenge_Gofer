@@ -25,10 +25,7 @@ function request_location(assigned) {
 
         var p_object = assigned_copy[i];
         var p_id = Object.keys(p_object)[0];
-
-        
-
-
+     
         if (cur_time <= p_object[p_id].leave && p_object[p_id].leave < cur_time + 5) {
             // send p_id to the destination
             people[p_id].x = p_object[p_id].x;
@@ -36,9 +33,7 @@ function request_location(assigned) {
             ic = ic + 1;
         }
         else if (cur_time-5 < p_object[p_id].finish && p_object[p_id].finish <= cur_time) {
-            // send p_id to the origin  
-            people[p_id].x = 0;
-            people[p_id].y = 0;
+            
             // Make p_id available
             available.push(p_id);
             // Unassign p_id
@@ -51,17 +46,40 @@ function request_location(assigned) {
 }
 
 function closest_task(person, buffer) {
-    dist_array = []
+    // This function will return the closest task to the current person
+
+    // Something like a dictionary with key being the task and the value being the distance between the task and person 
+    dist_array = []; 
     for (var i = 0; i < buffer.length; i++) {
         x1 = person.x;
         x2 = buffer[i].x;
         y1 = person.y;
         y2 = buffer[i].y;
-        dist_array[i] = Math.pow(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2), 0.5);
-
-
+        dist_array[i] = { task: buffer[i], distance: Math.pow(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2), 0.5) };
     }
+    dist_array.sort(function (a, b) {
+        return a.distance - b.distance;
+    });
+    return dist_array[0];
+}
 
+function closest_person(task, available) {
+    // This function will return the closest person to the current task 
+
+    // Something like a dictionary with key being the task and the value being the distance between the task and person 
+    dist_array = [];
+    for (var i = 0; i < available.length; i++) {
+        person = people[available[i]];
+        x1 = person.x;
+        x2 = task.x;
+        y1 = person.y;
+        y2 = task.y;
+        dist_array[i] = {person_index: available[i], distance: Math.pow(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2), 0.5) };
+    }
+    dist_array.sort(function (a, b) {
+        return a.distance - b.distance;
+    });
+    return dist_array[0];
 }
 
 
@@ -69,20 +87,17 @@ function attributeMissions(tasks) {
     buffer = buffer.concat(tasks);
     if (0 < available.length && available.length < buffer.length) {
         // Then there aren't enough people available to assign to all tasks.
+        
         for (var i = 0; i < available.length; i++) {
             var person_index = available[i];
-            var p_object = people[p_id]
+            var p_object = people[person_index];
             // Find the closest task to this person 
-            for (var j = 0; j < buffer.length; j++) {
-
-
-            }
-
-
-
-
-            var task = buffer.shift();
-            var dist = Math.pow(Math.pow(task.x, 2) + Math.pow(task.y, 2), 0.5);
+            var td_object = closest_task(p_object, buffer);
+            var task = td_object.task;
+            var dist = td_object.distance;
+            // Remove the object from the buffer
+            buffer.splice(task, 1);
+            // Assign the task to the person 
             var obj = {};
             obj[person_index] = {
                 leave: task.start - (dist / 15) * 60,
@@ -95,22 +110,25 @@ function attributeMissions(tasks) {
         // Everyone has been assigned so no one is available. 
         available = [];
     }
+
     else if (available.length >= buffer.length) {
         // There are enough people to assign to all tasks. 
         for (var i = 0; i < buffer.length; i++) {
-            var p_id = available.shift();
-            
-
-
-
-            var dist = Math.pow(Math.pow(tasks[i].x, 2) + Math.pow(tasks[i].y, 2), 0.5);
+            var task = buffer[i];
+            // Find the closest person to the current task 
+            var pd_object = closest_person(task, available);
+            var dist = pd_object.distance;
+            var p_id = pd_object.person_index;
+            // Remove the person from available people
+            available.splice(p_id, 1);
+            // Assign that person to the current task 
             var obj = {};
-            obj[person_index] = {
+            obj[p_id] = {
                 // The person should leave the origin at this time in order to reach at the destination on time. 
-                leave: tasks[i].start - (dist / 15) * 60,
-                finish: tasks[i].start + tasks[i].length,
-                x: tasks[i].x,
-                y: tasks[i].y
+                leave: task.start - (dist / 15) * 60,
+                finish: task.start + task.length,
+                x: task.x,
+                y: task.y
             };
             assigned.push(obj);
         }
@@ -119,7 +137,6 @@ function attributeMissions(tasks) {
     }
     request_location(assigned);
     cur_time += 5;
-    console.log("Initiation Count " + ic);
-    console.log("Termination Count " + count);
+
     return people;
 }
